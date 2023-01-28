@@ -29,12 +29,10 @@ mod pdf {
         const REGULAR: &str = "/usr/share/fonts/TTF/DejaVuSans.ttf";
         const BOLD: &str = "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf";
         const ITALIC: &str = "/usr/share/fonts/TTF/DejaVuSans-Oblique.ttf";
-        const BOLD_ITALIC: &str = "/usr/share/fonts/TTF/DejaVuSans-BoldOblique.ttf";
         let fonts = Fonts {
             regular: Font::new(&document, REGULAR)?,
             bold: Font::new(&document, BOLD)?,
             italic: Font::new(&document, ITALIC)?,
-            bold_italic: Font::new(&document, BOLD_ITALIC)?,
         };
 
         let mut date = log.start_date;
@@ -164,7 +162,6 @@ mod pdf {
 
     struct Page {
         layer: PdfLayerReference,
-        x: Mm,
         y: Mm,
     }
 
@@ -172,7 +169,7 @@ mod pdf {
         fn new(document: &PdfDocumentReference, (x, y): (Mm, Mm)) -> Self {
             let (page, layer) = document.add_page(x, y, "");
             let layer = document.get_page(page).get_layer(layer);
-            Self { layer, x, y }
+            Self { layer, y }
         }
     }
 
@@ -180,7 +177,6 @@ mod pdf {
         regular: Font,
         bold: Font,
         italic: Font,
-        bold_italic: Font,
     }
 
     struct Font {
@@ -269,7 +265,6 @@ mod pdf {
             let shift_left = match self.align {
                 Align::Left => Mm(0.0),
                 Align::Center => self.width() / 2.0,
-                Align::Right => self.width(),
             };
             let x = self.position.0 - shift_left;
             let y = page.y - self.position.1;
@@ -333,7 +328,6 @@ mod pdf {
     enum Align {
         Left,
         Center,
-        Right,
     }
 
     use crate::log;
