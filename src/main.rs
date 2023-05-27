@@ -1,30 +1,21 @@
-fn main() -> anyhow::Result<()> {
-    if !Path::new("log.txt").exists() {
-        eprintln!("Initializing blank log `log.txt`");
-        let log = Log::blank(
-            Date::from_calendar_date(2021, Month::August, 30).unwrap(),
-            1095,
-        )
-        .to_string();
-        fs::write("log.txt", log).context("failed to write `log.txt`")?;
-        return Ok(());
-    }
+#![feature(portable_simd)]
 
+fn main() -> anyhow::Result<()> {
     eprintln!("Reading log file…");
 
-    let log = fs::read_to_string("log.txt").context("failed to read `log.txt`")?;
-    let log = log.parse::<Log>().context("failed to parse `log.txt`")?;
+    let log = fs::read_to_string("log.toml").context("failed to read `log.toml`")?;
+    let log = log.parse::<Log>().context("failed to parse `log.toml`")?;
 
     eprintln!("Generating PDF…");
 
-    pdf::render(log, "illness-calendar.pdf").context("failed to render PDF")?;
+    pdf::render(log, "calendar.pdf").context("failed to render PDF")?;
 
     Ok(())
 }
 
 mod pdf {
-    pub fn render(log: Log, file: &str) -> anyhow::Result<()> {
-        let document = PdfDocument::empty("Illness Calendar");
+    pub(crate) fn render(log: Log, file: &str) -> anyhow::Result<()> {
+        let document = PdfDocument::empty("Calendar");
 
         const REGULAR: &str = "/usr/share/fonts/TTF/DejaVuSans.ttf";
         const BOLD: &str = "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf";
@@ -35,15 +26,15 @@ mod pdf {
             italic: Font::new(&document, ITALIC)?,
         };
 
-        let mut date = log.start_date;
-        let mut days_iter = log.days.into_iter();
-        while !days_iter.as_slice().is_empty() {
+        let mut date = log.start_date();
+        let mut days_iter = log.days();
+        while days_iter.len() != 0 {
             let year = date.year();
 
             let mut days = Vec::new();
             let mut past_date = Date::from_ordinal_date(year, 1).unwrap();
             while past_date != date {
-                days.push(log::Day::default());
+                days.push(None);
                 past_date = past_date.next_day().unwrap();
             }
 
@@ -114,24 +105,24 @@ mod pdf {
                     let x = left + inner_col_width / 2.0;
                     let y = top + vspacing + text.height();
 
-                    enum Shape {
-                        Circle,
-                        Rect,
-                    }
-
-                    let shape = match days.next().unwrap().state {
-                        log::State::Unknown => Some((rgb(192, 192, 192), Shape::Rect)),
-                        log::State::Well => None,
-                        log::State::Sick => Some((rgb(126, 126, 126), Shape::Circle)),
-                        log::State::Vaccine => Some((rgb(255, 127, 127), Shape::Circle)),
-                    };
-                    match shape {
+                    let highlight = days.next().unwrap().map(|highlight| {
+                        (
+                            Color::Rgb(Rgb {
+                                r: f64::from(highlight.colour.0[0]) / 255.0,
+                                g: f64::from(highlight.colour.0[1]) / 255.0,
+                                b: f64::from(highlight.colour.0[2]) / 255.0,
+                                icc_profile: None,
+                            }),
+                            highlight.shape,
+                        )
+                    });
+                    match highlight {
                         Some((color, Shape::Circle)) => {
                             let y = y - text.height() / 2.0;
                             let radius = text.height() + Mm(1.0);
                             draw_circle((x, y), radius, 60, color, &page);
                         }
-                        Some((color, Shape::Rect)) => {
+                        Some((color, Shape::Rectangle)) => {
                             // a tiny bit of overlap avoids tiny white bars
                             let width = inner_col_width + Mm(0.1);
                             let height = text.height() + vspacing * 2.0 + Mm(0.1);
@@ -330,8 +321,8 @@ mod pdf {
         Center,
     }
 
-    use crate::log;
     use crate::log::Log;
+    use crate::log::Shape;
     use anyhow::Context as _;
     use printpdf::Color;
     use printpdf::IndirectFontRef;
@@ -356,6 +347,3 @@ mod log;
 
 use anyhow::Context as _;
 use std::fs;
-use std::path::Path;
-use time::Date;
-use time::Month;

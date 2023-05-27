@@ -1,15 +1,17 @@
 [package]
 name = "calendar"
-version = "0.1.0"
+version = "0.0.0"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+publish = false
 
 [profile.release]
 overflow-checks = true
 
 [dependencies]
+ahash = "0.8.3"
 anyhow = "1.0.68"
 printpdf = "0.5.3"
 rusttype = "0.9.3"
-time = { version = "0.3.17", features = ["formatting", "parsing"] }
+serde = { version = "1.0.163", features = ["derive"] }
+time = { version = "0.3.17", features = ["formatting", "parsing", "serde-human-readable"] }
+toml = "0.7.4"
