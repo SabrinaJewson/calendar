@@ -1,6 +1,31 @@
 #![feature(portable_simd)]
 
 fn main() -> anyhow::Result<()> {
+    let mut args = env::args().skip(1);
+    match args.next().as_deref() {
+        Some("generate-days-from") => {
+            let start_date = args.next().context("no starting date")?;
+            let end_date = args.next().context("no ending date")?;
+            anyhow::ensure!(args.next().is_none(), "unexpected trailing arguments");
+            let start_date =
+                Date::parse(&start_date, DATE_FORMAT).context("failed to parse starting date")?;
+            let end_date =
+                Date::parse(&end_date, DATE_FORMAT).context("failed to parse end date")?;
+            anyhow::ensure!(start_date <= end_date, "start date is not before end date");
+            let mut current_date = start_date;
+            let mut stdout = io::stdout().lock();
+            while current_date <= end_date {
+                current_date
+                    .format_into(&mut stdout, date_format::TOML_KEY)
+                    .context("failed to format date")?;
+                current_date = current_date.next_day().unwrap();
+            }
+            return Ok(());
+        }
+        Some(cmd) => anyhow::bail!("unknown command `{cmd}`"),
+        None => {}
+    }
+
     eprintln!("Reading log file…");
 
     let log = fs::read_to_string("log.toml").context("failed to read `log.toml`")?;
@@ -12,6 +37,40 @@ fn main() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+mod date_format {
+    pub(crate) const DATE_FORMAT: &[FormatItem<'_>] = &[
+        FormatItem::Component(Component::Year(Year::default())),
+        FormatItem::Literal(b"-"),
+        FormatItem::Component(Component::Month(Month::default())),
+        FormatItem::Literal(b"-"),
+        FormatItem::Component(Component::Day(Day::default())),
+    ];
+
+    pub(crate) const TOML_KEY: &[FormatItem<'_>] = &[
+        FormatItem::Component(Component::Year(Year::default())),
+        FormatItem::Literal(b"-"),
+        FormatItem::Component(Component::Month(Month::default())),
+        FormatItem::Literal(b"-"),
+        FormatItem::Component(Component::Day(Day::default())),
+        FormatItem::Literal(b"."),
+        FormatItem::Component(Component::Weekday({
+            let mut weekday = Weekday::default();
+            weekday.repr = WeekdayRepr::Short;
+            weekday
+        })),
+        FormatItem::Literal(b" = \"\"\n"),
+    ];
+
+    use time::format_description::modifier::Day;
+    use time::format_description::modifier::Month;
+    use time::format_description::modifier::Weekday;
+    use time::format_description::modifier::WeekdayRepr;
+    use time::format_description::modifier::Year;
+    use time::format_description::Component;
+    use time::format_description::FormatItem;
+}
+use date_format::DATE_FORMAT;
 
 mod pdf {
     pub(crate) fn render(log: Log, file: &str) -> anyhow::Result<()> {
@@ -346,4 +405,7 @@ use log::Log;
 mod log;
 
 use anyhow::Context as _;
+use std::env;
 use std::fs;
+use std::io;
+use time::Date;

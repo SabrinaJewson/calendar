@@ -289,9 +289,9 @@ mod data {
     }
 
     use super::day;
+    use super::util::Exact;
     use super::util::LiteralStr;
     use super::Day;
-    use super::util::Exact;
     use serde::de;
     use serde::Deserializer;
     use std::collections::HashMap;
